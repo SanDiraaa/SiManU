@@ -4,7 +4,7 @@
  * Siklus hidup: Install, Activate, Fetch (Cache First with Network Fallback)
  */
 
-const CACHE_NAME = 'pocketledger-pwa-v2.2';
+const CACHE_NAME = 'pocketledger-pwa-v2.3';
 
 // Daftar aset statis inti yang wajib dicache saat instalasi
 const PRECACHE_ASSETS = [
@@ -14,7 +14,7 @@ const PRECACHE_ASSETS = [
   './js/vendor/dexie.min.js',
   './js/vendor/lucide.min.js',
   './js/app.bundle.js',
-  './js/app.bundle.js?v=2.2.0',
+  './js/app.bundle.js?v=2.3.0',
   './js/db.js',
   './js/app.js',
   './js/utils/formatters.js',

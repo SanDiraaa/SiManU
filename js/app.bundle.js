@@ -1223,6 +1223,28 @@ function calculateSplitBill(session) {
   const flatFee = Number(session.flatFee) || 0;
   const numParticipants = participants.length;
 
+  // Jika belum ada peserta, hitung total tagihan dari item yang ada
+  if (numParticipants === 0) {
+    let totalSubtotal = 0;
+    items.forEach(item => {
+      totalSubtotal += Number(item.price) || 0;
+    });
+    const taxRate = taxPercent / 100;
+    const serviceRate = servicePercent / 100;
+    const totalTax = Math.round(totalSubtotal * taxRate);
+    const totalService = Math.round(totalSubtotal * serviceRate);
+    const grandTotal = totalSubtotal + totalTax + totalService + flatFee;
+
+    return {
+      participants: [],
+      totalSubtotal,
+      totalTax,
+      totalService,
+      totalFlatFee: flatFee,
+      grandTotal
+    };
+  }
+
   // Inisialisasi map hasil per peserta
   const participantMap = {};
   participants.forEach(pName => {
@@ -1258,6 +1280,8 @@ function calculateSplitBill(session) {
         });
         participantMap[name].subtotal += portionPrice;
       });
+    } else if (itemPrice > 0) {
+      totalSubtotal += itemPrice;
     }
   });
 
@@ -1266,7 +1290,7 @@ function calculateSplitBill(session) {
   const serviceRate = servicePercent / 100;
   const flatPerPerson = numParticipants > 0 ? flatFee / numParticipants : 0;
 
-  let grandTotal = 0;
+  let assignedGrandTotal = 0;
   let totalTax = 0;
   let totalService = 0;
 
@@ -1285,18 +1309,22 @@ function calculateSplitBill(session) {
 
     totalTax += pTax;
     totalService += pService;
-    grandTotal += pTotal;
+    assignedGrandTotal += pTotal;
 
     return p;
   });
 
+  const calcTotalTax = Math.round(totalSubtotal * taxRate);
+  const calcTotalService = Math.round(totalSubtotal * serviceRate);
+  const overallGrandTotal = totalSubtotal + calcTotalTax + calcTotalService + flatFee;
+
   return {
     participants: resultParticipants,
     totalSubtotal,
-    totalTax,
-    totalService,
+    totalTax: calcTotalTax,
+    totalService: calcTotalService,
     totalFlatFee: flatFee,
-    grandTotal
+    grandTotal: Math.max(assignedGrandTotal, overallGrandTotal)
   };
 }
 
@@ -1321,11 +1349,9 @@ class SplitBillComponent {
       servicePercent: 0,
       flatFee: 0,
       paymentInfo: '',
-      participants: ['Ahmad', 'Budi'],
+      participants: [],
       items: [
-        { id: 1, name: 'Makanan / Paket 1', price: 45000, participants: ['Ahmad'] },
-        { id: 2, name: 'Makanan / Paket 2', price: 50000, participants: ['Budi'] },
-        { id: 3, name: 'Camilan Bareng', price: 30000, participants: ['Ahmad', 'Budi'] }
+        { id: 1, name: '', price: 0, participants: [] }
       ]
     };
   }
@@ -1461,7 +1487,7 @@ class SplitBillComponent {
               type="text"
               id="session-payment-info"
               value="${this.session.paymentInfo}"
-              placeholder="Contoh: BCA 123456 a.n Budi / GoPay 08123..."
+              placeholder="Contoh: BCA 123456 / GoPay 08123..."
               class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
             />
           </div>
@@ -1494,14 +1520,14 @@ class SplitBillComponent {
 
         <!-- Chips Peserta -->
         <div class="flex flex-wrap gap-2 pt-1">
-          ${this.session.participants.map(name => `
+          ${this.session.participants.length === 0 ? `
+            <p class="text-xs text-slate-500 italic py-1">Belum ada peserta. Masukkan nama di atas lalu klik Tambah.</p>
+          ` : this.session.participants.map(name => `
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700/80 text-slate-200">
               ${name}
-              ${this.session.participants.length > 2 ? `
-                <button type="button" data-remove-participant="${name}" class="text-slate-500 hover:text-rose-400 ml-0.5" title="Hapus">
-                  <i data-lucide="x" class="w-3 h-3"></i>
-                </button>
-              ` : ''}
+              <button type="button" data-remove-participant="${name}" class="text-slate-400 hover:text-rose-400 ml-0.5 p-0.5 transition-colors" title="Hapus peserta">
+                <i data-lucide="x" class="w-3 h-3"></i>
+              </button>
             </span>
           `).join('')}
         </div>
@@ -1523,7 +1549,7 @@ class SplitBillComponent {
         <!-- List Item -->
         <div class="space-y-3">
           ${this.session.items.map((item, idx) => `
-            <div class="bg-slate-900/80 border border-slate-700/70 rounded-2xl p-3 space-y-2.5">
+            <div class="item-menu-card bg-slate-900/80 border border-slate-700/70 rounded-2xl p-3 space-y-2.5">
               <div class="flex items-center justify-between gap-2">
                 <input
                   type="text"
@@ -1546,7 +1572,7 @@ class SplitBillComponent {
                   />
                 </div>
                 ${this.session.items.length > 1 ? `
-                  <button type="button" data-remove-item-idx="${idx}" class="p-1.5 text-slate-500 hover:text-rose-400" title="Hapus menu">
+                  <button type="button" data-remove-item-idx="${idx}" class="p-1.5 text-slate-500 hover:text-rose-400 transition-colors" title="Hapus menu">
                     <i data-lucide="trash" class="w-3.5 h-3.5"></i>
                   </button>
                 ` : ''}
@@ -1556,12 +1582,16 @@ class SplitBillComponent {
               <div>
                 <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1.5">
                   <span>Dipesan / Dimakan oleh:</span>
-                  <button type="button" data-select-all-idx="${idx}" class="text-indigo-400 hover:text-indigo-300 font-semibold">
-                    ${item.participants.length === this.session.participants.length ? 'Batal Semua' : 'Pilih Semua'}
-                  </button>
+                  ${this.session.participants.length > 0 ? `
+                    <button type="button" data-select-all-idx="${idx}" class="text-indigo-400 hover:text-indigo-300 font-semibold">
+                      ${item.participants.length === this.session.participants.length ? 'Batal Semua' : 'Pilih Semua'}
+                    </button>
+                  ` : ''}
                 </div>
                 <div class="flex flex-wrap gap-1.5">
-                  ${this.session.participants.map(pName => {
+                  ${this.session.participants.length === 0 ? `
+                    <p class="text-[11px] text-slate-500 italic py-0.5">Tambahkan peserta terlebih dahulu di atas.</p>
+                  ` : this.session.participants.map(pName => {
                     const isSelected = item.participants.includes(pName);
                     return `
                       <button
@@ -1575,12 +1605,10 @@ class SplitBillComponent {
                     `;
                   }).join('')}
                 </div>
-                ${item.participants.length === 0 ? `
-                  <div class="text-[10px] text-amber-400 mt-1 flex items-center gap-1">
-                    <i data-lucide="alert-circle" class="w-3 h-3"></i>
-                    Pilih minimal 1 orang yang memesan menu ini.
-                  </div>
-                ` : ''}
+                <div id="item-warning-${idx}" class="item-warning text-[10px] text-amber-400 mt-1 ${item.participants.length === 0 && this.session.participants.length > 0 ? 'flex' : 'hidden'} items-center gap-1">
+                  <i data-lucide="alert-circle" class="w-3 h-3"></i>
+                  Pilih minimal 1 orang yang memesan menu ini.
+                </div>
               </div>
             </div>
           `).join('')}
@@ -1588,106 +1616,203 @@ class SplitBillComponent {
       </div>
 
       <!-- 4. HASIL PERHITUNGAN PROPORSIONAL (SUMMARY) -->
-      <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 rounded-3xl p-5 shadow-2xl space-y-4">
-        
-        <div class="flex items-center justify-between pb-3 border-b border-slate-700/70">
-          <div>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Tagihan Bersama</div>
-            <div class="text-2xl font-black text-white font-mono mt-0.5">
-              ${formatRupiah(calcResult.grandTotal)}
-            </div>
-          </div>
-          <div class="text-right text-[11px] text-slate-400 space-y-0.5">
-            <div>Subtotal: <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalSubtotal)}</span></div>
-            ${calcResult.totalTax > 0 ? `<div>Pajak (${this.session.taxPercent}%): <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalTax)}</span></div>` : ''}
-            ${calcResult.totalService > 0 ? `<div>Servis (${this.session.servicePercent}%): <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalService)}</span></div>` : ''}
-            ${calcResult.totalFlatFee > 0 ? `<div>Biaya Flat: <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalFlatFee)}</span></div>` : ''}
+      <div id="splitbill-summary-container" class="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 rounded-3xl p-5 shadow-2xl space-y-4">
+        ${this.renderSummaryContent(calcResult)}
+      </div>
+    `;
+  }
+
+  /**
+   * Render Konten Ringkasan & Rincian Per Individu
+   */
+  renderSummaryContent(calcResult) {
+    const hasParticipants = this.session.participants.length > 0;
+
+    return `
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700/70">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Tagihan Bersama</div>
+          <div class="text-2xl font-black text-white font-mono mt-0.5">
+            ${formatRupiah(calcResult.grandTotal)}
           </div>
         </div>
+        <div class="text-right text-[11px] text-slate-400 space-y-0.5">
+          <div>Subtotal: <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalSubtotal)}</span></div>
+          ${calcResult.totalTax > 0 ? `<div>Pajak (${this.session.taxPercent}%): <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalTax)}</span></div>` : ''}
+          ${calcResult.totalService > 0 ? `<div>Servis (${this.session.servicePercent}%): <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalService)}</span></div>` : ''}
+          ${calcResult.totalFlatFee > 0 ? `<div>Biaya Flat: <span class="font-mono text-slate-200">${formatRupiah(calcResult.totalFlatFee)}</span></div>` : ''}
+        </div>
+      </div>
 
-        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Rincian Per Individu (Proporsional)</h4>
+      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Rincian Per Individu (Proporsional)</h4>
 
-        <!-- Cards Rincian Per Orang -->
-        <div class="space-y-3">
-          ${calcResult.participants.map(p => `
-            <div class="bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3.5 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
-                  <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px]">
-                    ${p.name.charAt(0).toUpperCase()}
-                  </div>
-                  ${p.name}
-                </span>
-                <span class="text-sm font-black font-mono text-emerald-400">
-                  ${formatRupiah(p.total)}
-                </span>
-              </div>
-
-              <!-- List item yang dinikmati -->
-              <div class="text-[11px] text-slate-400 space-y-1 pl-1 border-l-2 border-slate-700/60 ml-2">
-                ${p.items.length === 0 ? `
-                  <div class="italic text-slate-500">Tidak ada menu yang dicentang</div>
-                ` : p.items.map(it => `
-                  <div class="flex justify-between">
-                    <span class="truncate pr-2">${it.name} ${it.sharedCount > 1 ? `<span class="text-[9px] text-indigo-400">(bagi ${it.sharedCount})</span>` : ''}</span>
-                    <span class="font-mono text-slate-300">${formatRupiah(it.portionPrice)}</span>
-                  </div>
-                `).join('')}
-
-                <div class="pt-1 mt-1 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
-                  <span>Subtotal Makanan</span>
-                  <span class="font-mono">${formatRupiah(p.subtotal)}</span>
+      <!-- Cards Rincian Per Orang -->
+      <div class="space-y-3">
+        ${!hasParticipants ? `
+          <div class="bg-slate-900/60 border border-slate-700/40 rounded-2xl p-4 text-center text-xs text-slate-400 italic">
+            Tambahkan minimal 2 nama peserta pada bagian Peserta di atas untuk melihat pembagian tagihan per orang.
+          </div>
+        ` : calcResult.participants.map(p => `
+          <div class="bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
+                <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold">
+                  ${p.name.charAt(0).toUpperCase()}
                 </div>
-                ${(p.tax + p.service) > 0 ? `
-                  <div class="text-[10px] text-slate-400 flex justify-between">
-                    <span>Porsi Pajak & Servis</span>
-                    <span class="font-mono">+${formatRupiah(p.tax + p.service)}</span>
-                  </div>
-                ` : ''}
-                ${p.flatFee > 0 ? `
-                  <div class="text-[10px] text-slate-400 flex justify-between">
-                    <span>Porsi Biaya Flat (Parkir/Ongkir)</span>
-                    <span class="font-mono">+${formatRupiah(p.flatFee)}</span>
-                  </div>
-                ` : ''}
-              </div>
+                ${p.name}
+              </span>
+              <span class="text-sm font-black font-mono text-emerald-400">
+                ${formatRupiah(p.total)}
+              </span>
             </div>
-          `).join('')}
-        </div>
 
-        <!-- 5. TOMBOL BAGIKAN & SIMPAN -->
-        <div class="pt-2 space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              id="btn-copy-wa"
-              type="button"
-              class="w-full py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition-all"
-            >
-              <i data-lucide="copy" class="w-4 h-4"></i>
-              Salin Format WA
-            </button>
-            <button
-              id="btn-open-wa"
-              type="button"
-              class="w-full py-3 px-3 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition-all"
-            >
-              <i data-lucide="send" class="w-4 h-4"></i>
-              Kirim via WhatsApp
-            </button>
+            <!-- List item yang dinikmati -->
+            <div class="text-[11px] text-slate-400 space-y-1 pl-1 border-l-2 border-slate-700/60 ml-2">
+              ${p.items.length === 0 ? `
+                <div class="italic text-slate-500">Belum ada menu yang dicentang</div>
+              ` : p.items.map(it => `
+                <div class="flex justify-between">
+                  <span class="truncate pr-2">${it.name || 'Menu'} ${it.sharedCount > 1 ? `<span class="text-[9px] text-indigo-400">(bagi ${it.sharedCount})</span>` : ''}</span>
+                  <span class="font-mono text-slate-300">${formatRupiah(it.portionPrice)}</span>
+                </div>
+              `).join('')}
+
+              <div class="pt-1 mt-1 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
+                <span>Subtotal Makanan</span>
+                <span class="font-mono">${formatRupiah(p.subtotal)}</span>
+              </div>
+              ${(p.tax + p.service) > 0 ? `
+                <div class="text-[10px] text-slate-400 flex justify-between">
+                  <span>Porsi Pajak & Servis</span>
+                  <span class="font-mono">+${formatRupiah(p.tax + p.service)}</span>
+                </div>
+              ` : ''}
+              ${p.flatFee > 0 ? `
+                <div class="text-[10px] text-slate-400 flex justify-between">
+                  <span>Porsi Biaya Flat (Parkir/Ongkir)</span>
+                  <span class="font-mono">+${formatRupiah(p.flatFee)}</span>
+                </div>
+              ` : ''}
+            </div>
           </div>
+        `).join('')}
+      </div>
 
+      <!-- 5. TOMBOL BAGIKAN & SIMPAN -->
+      <div class="pt-2 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
           <button
-            id="btn-save-session"
+            id="btn-copy-wa"
             type="button"
-            class="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-2 transition-all"
+            class="w-full py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition-all"
           >
-            <i data-lucide="save" class="w-4 h-4"></i>
-            Simpan Sesi ke Database Offline
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            Salin Format WA
+          </button>
+          <button
+            id="btn-open-wa"
+            type="button"
+            class="w-full py-3 px-3 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-1.5 transition-all"
+          >
+            <i data-lucide="send" class="w-4 h-4"></i>
+            Kirim via WhatsApp
           </button>
         </div>
 
+        <button
+          id="btn-save-session"
+          type="button"
+          class="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-2 transition-all"
+        >
+          <i data-lucide="save" class="w-4 h-4"></i>
+          Simpan Sesi ke Database Offline
+        </button>
       </div>
     `;
+  }
+
+  /**
+   * Perbarui kalkulasi ringkasan secara reaktif tanpa me-render ulang seluruh halaman
+   */
+  updateCalculationsSummary(container) {
+    if (!container) return;
+    const summaryContainer = container.querySelector('#splitbill-summary-container');
+    if (!summaryContainer) return;
+
+    const calcResult = calculateSplitBill(this.session);
+    summaryContainer.innerHTML = this.renderSummaryContent(calcResult);
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+
+    this.bindSummaryButtons(container);
+  }
+
+  bindSummaryButtons(container) {
+    if (!container) return;
+
+    // Tombol Salin Format WA
+    const btnCopyWA = container.querySelector('#btn-copy-wa');
+    if (btnCopyWA) {
+      btnCopyWA.onclick = async () => {
+        if (this.session.participants.length < 2) {
+          alert('Minimal 2 orang peserta untuk membuat format tagihan WhatsApp.');
+          return;
+        }
+        const calcResult = calculateSplitBill(this.session);
+        const text = generateWhatsAppSplitBillText(this.session, calcResult);
+        const success = await copyToClipboard(text);
+        if (success) {
+          this.showToast('Format rincian berhasil disalin! Tinggal tempel di grup WhatsApp.');
+        } else {
+          alert('Gagal menyalin otomatis. Silakan izinkan akses clipboard browser Anda.');
+        }
+      };
+    }
+
+    // Tombol Kirim Langsung via WA
+    const btnOpenWA = container.querySelector('#btn-open-wa');
+    if (btnOpenWA) {
+      btnOpenWA.onclick = () => {
+        if (this.session.participants.length < 2) {
+          alert('Minimal 2 orang peserta untuk mengirim tagihan ke WhatsApp.');
+          return;
+        }
+        const calcResult = calculateSplitBill(this.session);
+        const text = generateWhatsAppSplitBillText(this.session, calcResult);
+        openWhatsAppWithText(text);
+      };
+    }
+
+    // Tombol Simpan Sesi ke IndexedDB
+    const btnSaveSession = container.querySelector('#btn-save-session');
+    if (btnSaveSession) {
+      btnSaveSession.onclick = async () => {
+        if (this.session.participants.length < 2) {
+          alert('Minimal 2 orang peserta untuk menyimpan sesi split bill.');
+          return;
+        }
+        const calcResult = calculateSplitBill(this.session);
+        const sessionPayload = {
+          ...this.session,
+          totalAmount: calcResult.grandTotal,
+          status: 'open',
+          date: this.session.date || new Date().toISOString()
+        };
+
+        if (this.session.id) {
+          await SplitBillService.update(this.session.id, sessionPayload);
+          this.showToast('Sesi split bill berhasil diperbarui di database offline!');
+        } else {
+          const newId = await SplitBillService.add(sessionPayload);
+          this.session.id = newId;
+          this.showToast('Sesi split bill berhasil disimpan ke database offline!');
+        }
+
+        this.onDataChanged(true); // reload saved list from DB
+      };
+    }
   }
 
   /**
@@ -1836,7 +1961,7 @@ class SplitBillComponent {
     if (taxInput) {
       taxInput.addEventListener('input', (e) => {
         this.session.taxPercent = Number(e.target.value) || 0;
-        this.onDataChanged();
+        this.updateCalculationsSummary(container);
       });
     }
 
@@ -1844,17 +1969,21 @@ class SplitBillComponent {
     if (serviceInput) {
       serviceInput.addEventListener('input', (e) => {
         this.session.servicePercent = Number(e.target.value) || 0;
-        this.onDataChanged();
+        this.updateCalculationsSummary(container);
       });
     }
 
     const flatFeeInput = container.querySelector('#session-flat-fee');
     if (flatFeeInput) {
       flatFeeInput.addEventListener('input', (e) => {
-        const parsed = parseNumberInput(e.target.value);
+        const rawVal = e.target.value;
+        const parsed = parseNumberInput(rawVal);
         this.session.flatFee = parsed;
-        e.target.value = formatInputDigits(parsed);
-        this.onDataChanged();
+        const formatted = formatInputDigits(parsed);
+        if (rawVal !== formatted && rawVal.replace(/\D/g, '') === String(parsed)) {
+          e.target.value = formatted;
+        }
+        this.updateCalculationsSummary(container);
       });
     }
 
@@ -1894,15 +2023,11 @@ class SplitBillComponent {
       });
     }
 
-    // Hapus Peserta
+    // Hapus Peserta (Bisa hapus siapapun tanpa batasan minimal saat mengedit)
     const removeParticipantBtns = container.querySelectorAll('[data-remove-participant]');
     removeParticipantBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const nameToRemove = btn.getAttribute('data-remove-participant');
-        if (this.session.participants.length <= 2) {
-          alert('Minimal 2 orang peserta untuk split bill.');
-          return;
-        }
         this.session.participants = this.session.participants.filter(p => p !== nameToRemove);
         // Hapus juga dari item yang dicentang
         this.session.items.forEach(it => {
@@ -1921,13 +2046,14 @@ class SplitBillComponent {
           id: newId,
           name: '',
           price: 0,
-          participants: [...this.session.participants] // default pilih semua
+          participants: [...this.session.participants] // default pilih semua peserta yang ada
         });
         this.onDataChanged();
       });
     }
 
-    // Update Field Item (Name / Price)
+    // Update Field Item (Nama Menu / Harga)
+    // PERBAIKAN: Hanya update data & kalkulasi summary tanpa me-render ulang seluruh halaman agar input tidak kehilangan fokus
     const itemInputs = container.querySelectorAll('[data-item-field]');
     itemInputs.forEach(input => {
       input.addEventListener('input', (e) => {
@@ -1935,13 +2061,18 @@ class SplitBillComponent {
         const idx = Number(input.getAttribute('data-item-idx'));
         if (this.session.items[idx]) {
           if (field === 'price') {
-            const parsed = parseNumberInput(e.target.value);
+            const rawVal = e.target.value;
+            const parsed = parseNumberInput(rawVal);
             this.session.items[idx].price = parsed;
-            e.target.value = formatInputDigits(parsed);
+            const formatted = formatInputDigits(parsed);
+            if (rawVal !== formatted && rawVal.replace(/\D/g, '') === String(parsed)) {
+              e.target.value = formatted;
+            }
           } else {
             this.session.items[idx][field] = e.target.value;
           }
-          this.onDataChanged();
+          // Perbarui hasil kalkulasi proporsional di card bawah secara instan tanpa re-render form
+          this.updateCalculationsSummary(container);
         }
       });
     });
@@ -1960,7 +2091,7 @@ class SplitBillComponent {
       });
     });
 
-    // Toggle Centang Peserta pada Item Tertentu
+    // Toggle Centang Peserta pada Item Tertentu (In-place update tanpa re-render form)
     const toggleParticipantBtns = container.querySelectorAll('[data-toggle-participant]');
     toggleParticipantBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1971,10 +2102,32 @@ class SplitBillComponent {
           const pIndex = item.participants.indexOf(pName);
           if (pIndex >= 0) {
             item.participants.splice(pIndex, 1);
+            btn.className = 'text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200';
           } else {
             item.participants.push(pName);
+            btn.className = 'text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all bg-emerald-600 border-emerald-500 text-white font-bold shadow-sm';
           }
-          this.onDataChanged();
+
+          // Perbarui teks tombol Pilih / Batal Semua jika ada
+          const selectAllBtn = container.querySelector(`[data-select-all-idx="${itemIdx}"]`);
+          if (selectAllBtn) {
+            selectAllBtn.textContent = (item.participants.length === this.session.participants.length && this.session.participants.length > 0)
+              ? 'Batal Semua' : 'Pilih Semua';
+          }
+
+          // Perbarui peringatan minimal 1 orang
+          const warnEl = container.querySelector(`#item-warning-${itemIdx}`);
+          if (warnEl) {
+            if (item.participants.length === 0 && this.session.participants.length > 0) {
+              warnEl.classList.remove('hidden');
+              warnEl.classList.add('flex');
+            } else {
+              warnEl.classList.remove('flex');
+              warnEl.classList.add('hidden');
+            }
+          }
+
+          this.updateCalculationsSummary(container);
         }
       });
     });
@@ -1985,66 +2138,43 @@ class SplitBillComponent {
       btn.addEventListener('click', () => {
         const itemIdx = Number(btn.getAttribute('data-select-all-idx'));
         const item = this.session.items[itemIdx];
-        if (item) {
-          if (item.participants.length === this.session.participants.length) {
+        if (item && this.session.participants.length > 0) {
+          const isAllSelected = item.participants.length === this.session.participants.length;
+          if (isAllSelected) {
             item.participants = [];
           } else {
             item.participants = [...this.session.participants];
           }
-          this.onDataChanged();
+
+          // Update tombol-tombol peserta pada baris menu ini
+          const parentCard = btn.closest('.item-menu-card') || btn.parentElement.parentElement;
+          const pBtns = parentCard.querySelectorAll('[data-toggle-participant]');
+          pBtns.forEach(pBtn => {
+            const pName = pBtn.getAttribute('data-toggle-participant');
+            const isSelected = item.participants.includes(pName);
+            pBtn.className = `text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all ${isSelected ? 'bg-emerald-600 border-emerald-500 text-white font-bold shadow-sm' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`;
+          });
+
+          btn.textContent = isAllSelected ? 'Pilih Semua' : 'Batal Semua';
+
+          const warnEl = container.querySelector(`#item-warning-${itemIdx}`);
+          if (warnEl) {
+            if (item.participants.length === 0 && this.session.participants.length > 0) {
+              warnEl.classList.remove('hidden');
+              warnEl.classList.add('flex');
+            } else {
+              warnEl.classList.remove('flex');
+              warnEl.classList.add('hidden');
+            }
+          }
+
+          this.updateCalculationsSummary(container);
         }
       });
     });
 
-    // Tombol Salin Format WA
-    const btnCopyWA = container.querySelector('#btn-copy-wa');
-    if (btnCopyWA) {
-      btnCopyWA.addEventListener('click', async () => {
-        const calcResult = calculateSplitBill(this.session);
-        const text = generateWhatsAppSplitBillText(this.session, calcResult);
-        const success = await copyToClipboard(text);
-        if (success) {
-          this.showToast('Format rincian berhasil disalin! Tinggal tempel di grup WhatsApp.');
-        } else {
-          alert('Gagal menyalin otomatis. Silakan izinkan akses clipboard browser Anda.');
-        }
-      });
-    }
-
-    // Tombol Kirim Langsung via WA
-    const btnOpenWA = container.querySelector('#btn-open-wa');
-    if (btnOpenWA) {
-      btnOpenWA.addEventListener('click', () => {
-        const calcResult = calculateSplitBill(this.session);
-        const text = generateWhatsAppSplitBillText(this.session, calcResult);
-        openWhatsAppWithText(text);
-      });
-    }
-
-    // Tombol Simpan Sesi ke IndexedDB
-    const btnSaveSession = container.querySelector('#btn-save-session');
-    if (btnSaveSession) {
-      btnSaveSession.addEventListener('click', async () => {
-        const calcResult = calculateSplitBill(this.session);
-        const sessionPayload = {
-          ...this.session,
-          totalAmount: calcResult.grandTotal,
-          status: 'open',
-          date: this.session.date || new Date().toISOString()
-        };
-
-        if (this.session.id) {
-          await SplitBillService.update(this.session.id, sessionPayload);
-          this.showToast('Sesi split bill berhasil diperbarui di database offline!');
-        } else {
-          const newId = await SplitBillService.add(sessionPayload);
-          this.session.id = newId;
-          this.showToast('Sesi split bill berhasil disimpan ke database offline!');
-        }
-
-        this.onDataChanged(true); // reload saved list from DB
-      });
-    }
+    // Inisialisasi tombol-tombol aksi pada card ringkasan
+    this.bindSummaryButtons(container);
 
     // Tombol Buka Sesi dari Riwayat
     const loadSessionBtns = container.querySelectorAll('[data-load-session-id]');
@@ -2061,7 +2191,7 @@ class SplitBillComponent {
             servicePercent: Number(found.servicePercent) || 0,
             flatFee: Number(found.flatFee) || 0,
             paymentInfo: found.paymentInfo || '',
-            participants: found.participants || ['Ahmad', 'Budi'],
+            participants: found.participants || [],
             items: found.items || []
           };
           this.activeView = 'editor';
