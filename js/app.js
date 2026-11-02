@@ -137,20 +137,28 @@ class AppStateRouter {
       window.location.hash = `#${target}`;
     }
 
-    // Update styling tombol bottom navigation bar
+    // Update styling tombol bottom navigation bar dengan aman (mendukung elemen HTML & SVG)
     Object.entries(this.tabButtons).forEach(([key, btn]) => {
       if (!btn) return;
       const icon = btn.querySelector('.tab-icon');
       const label = btn.querySelector('.tab-label');
 
       if (key === target) {
-        btn.className = 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-emerald-400 font-medium transition-colors relative';
-        if (icon) icon.className = 'tab-icon w-5 h-5 mb-1 text-emerald-400 stroke-[2.5]';
-        if (label) label.className = 'tab-label text-xs font-semibold text-emerald-400';
+        btn.setAttribute('class', 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-emerald-400 font-medium transition-colors relative');
+        if (icon) {
+          icon.setAttribute('class', 'tab-icon w-5 h-5 mb-1 text-emerald-400 stroke-[2.5]');
+        }
+        if (label) {
+          label.setAttribute('class', 'tab-label text-xs font-semibold text-emerald-400');
+        }
       } else {
-        btn.className = 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-slate-400 hover:text-slate-200 transition-colors relative';
-        if (icon) icon.className = 'tab-icon w-5 h-5 mb-1 text-slate-400 stroke-[1.8]';
-        if (label) label.className = 'tab-label text-xs text-slate-400';
+        btn.setAttribute('class', 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-slate-400 hover:text-slate-200 transition-colors relative');
+        if (icon) {
+          icon.setAttribute('class', 'tab-icon w-5 h-5 mb-1 text-slate-400 stroke-[1.8]');
+        }
+        if (label) {
+          label.setAttribute('class', 'tab-label text-xs text-slate-400');
+        }
       }
     });
 

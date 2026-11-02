@@ -67,3 +67,4 @@ const outputPath = path.join(ROOT_DIR, 'js', 'app.bundle.js');
 fs.writeFileSync(outputPath, combinedCode, 'utf8');
 
 console.log(`[Bundler] Berhasil membuat ${outputPath} (${fs.statSync(outputPath).size} bytes)`);
+
