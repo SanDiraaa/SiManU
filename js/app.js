@@ -74,17 +74,25 @@ class AppStateRouter {
         const reg = await navigator.serviceWorker.register('./sw.js');
         console.log('[PWA] Service Worker aktif dengan scope:', reg.scope);
 
+        // Paksa periksa pembaruan berkas sw.js pada setiap muat ulang
+        if (typeof reg.update === 'function') {
+          reg.update().catch(() => {});
+        }
+
         reg.onupdatefound = () => {
           const installingWorker = reg.installing;
-          installingWorker.onstatechange = () => {
-            if (installingWorker.state === 'installed') {
-              if (navigator.serviceWorker.controller) {
-                console.log('[PWA] Konten baru tersedia, silakan refresh.');
-              } else {
-                console.log('[PWA] Konten berhasil dicache untuk penggunaan offline.');
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  console.log('[PWA] Versi baru tersedia, mengaktifkan Service Worker...');
+                  installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                } else {
+                  console.log('[PWA] Konten berhasil dicache untuk penggunaan offline.');
+                }
               }
-            }
-          };
+            };
+          }
         };
       } catch (err) {
         console.warn('[PWA] Gagal meregistrasi Service Worker:', err);
@@ -125,6 +133,23 @@ class AppStateRouter {
   }
 
   /**
+   * Helper aman untuk mengubah styling class pada elemen HTML maupun SVG
+   * Mencegah "TypeError: Cannot set property className of #<SVGElement> which has only a getter"
+   */
+  setElementClasses(element, className) {
+    if (!element) return;
+    try {
+      if (typeof element.setAttribute === 'function') {
+        element.setAttribute('class', className);
+      } else if (element.classList) {
+        element.setAttribute('class', className);
+      }
+    } catch (err) {
+      console.warn('[Nav] Gagal mengatur class elemen:', err);
+    }
+  }
+
+  /**
    * 4. State Router: Navigasi Antar Tab Tanpa Reload
    */
   navigateTo(tabName, updateHistory = true) {
@@ -140,25 +165,29 @@ class AppStateRouter {
     // Update styling tombol bottom navigation bar dengan aman (mendukung elemen HTML & SVG)
     Object.entries(this.tabButtons).forEach(([key, btn]) => {
       if (!btn) return;
-      const icon = btn.querySelector('.tab-icon');
-      const label = btn.querySelector('.tab-label');
+      try {
+        const icon = btn.querySelector('.tab-icon') || btn.querySelector('svg') || btn.querySelector('i');
+        const label = btn.querySelector('.tab-label') || btn.querySelector('span');
 
-      if (key === target) {
-        btn.setAttribute('class', 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-emerald-400 font-medium transition-colors relative');
-        if (icon) {
-          icon.setAttribute('class', 'tab-icon w-5 h-5 mb-1 text-emerald-400 stroke-[2.5]');
+        if (key === target) {
+          this.setElementClasses(btn, 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-emerald-400 font-medium transition-colors relative');
+          if (icon) {
+            this.setElementClasses(icon, 'tab-icon w-5 h-5 mb-1 text-emerald-400 stroke-[2.5]');
+          }
+          if (label) {
+            this.setElementClasses(label, 'tab-label text-xs font-semibold text-emerald-400');
+          }
+        } else {
+          this.setElementClasses(btn, 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-slate-400 hover:text-slate-200 transition-colors relative');
+          if (icon) {
+            this.setElementClasses(icon, 'tab-icon w-5 h-5 mb-1 text-slate-400 stroke-[1.8]');
+          }
+          if (label) {
+            this.setElementClasses(label, 'tab-label text-xs text-slate-400');
+          }
         }
-        if (label) {
-          label.setAttribute('class', 'tab-label text-xs font-semibold text-emerald-400');
-        }
-      } else {
-        btn.setAttribute('class', 'tab-btn flex flex-col items-center justify-center py-2 px-3 text-slate-400 hover:text-slate-200 transition-colors relative');
-        if (icon) {
-          icon.setAttribute('class', 'tab-icon w-5 h-5 mb-1 text-slate-400 stroke-[1.8]');
-        }
-        if (label) {
-          label.setAttribute('class', 'tab-label text-xs text-slate-400');
-        }
+      } catch (navErr) {
+        console.warn(`[Nav] Gagal memperbarui tombol tab ${key}:`, navErr);
       }
     });
 
@@ -240,8 +269,14 @@ class AppStateRouter {
     await this.configureStatusBar();
 
     // 6. Buka tab awal berdasarkan hash URL atau default ke 'transaksi'
-    const initialHash = window.location.hash.replace('#', '');
-    this.navigateTo(initialHash || 'transaksi', false);
+    try {
+      const initialHash = window.location.hash.replace('#', '');
+      this.navigateTo(initialHash || 'transaksi', false);
+    } catch (navErr) {
+      console.warn('[PocketLedger] Initial navigation warning:', navErr);
+      this.currentTab = 'transaksi';
+      this.renderCurrentView();
+    }
   }
 
   /**

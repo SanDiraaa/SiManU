@@ -4,7 +4,7 @@
  * Siklus hidup: Install, Activate, Fetch (Cache First with Network Fallback)
  */
 
-const CACHE_NAME = 'pocketledger-pwa-v2.1';
+const CACHE_NAME = 'pocketledger-pwa-v2.2';
 
 // Daftar aset statis inti yang wajib dicache saat instalasi
 const PRECACHE_ASSETS = [
@@ -14,6 +14,7 @@ const PRECACHE_ASSETS = [
   './js/vendor/dexie.min.js',
   './js/vendor/lucide.min.js',
   './js/app.bundle.js',
+  './js/app.bundle.js?v=2.2.0',
   './js/db.js',
   './js/app.js',
   './js/utils/formatters.js',
@@ -105,4 +106,12 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+// 4. MESSAGE EVENT: Respon instruksi aktivasi segera dari client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Menerima instruksi SKIP_WAITING, mengaktifkan Service Worker seketika.');
+    self.skipWaiting();
+  }
 });
