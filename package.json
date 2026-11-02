@@ -1,0 +1,26 @@
+{
+  "name": "pocketledger",
+  "version": "1.0.0",
+  "description": "Aplikasi keuangan personal dan split bill mobile-first offline PWA",
+  "main": "index.html",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npm run build && npx cap sync android",
+    "cap:open": "npx cap open android"
+  },
+  "keywords": [
+    "pwa",
+    "capacitor",
+    "finance",
+    "offline-first"
+  ],
+  "author": "Sandy",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/status-bar": "^8.0.4"
+  }
+}

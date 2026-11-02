@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>PocketLedger - PWA Icon Generator</title>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; text-align: center; }
+    button { background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 8px; }
+    canvas { border: 1px solid #334155; border-radius: 12px; margin: 12px auto; display: block; }
+  </style>
+</head>
+<body>
+  <h2>PocketLedger Icon & Screenshot Generator (HTML Canvas)</h2>
+  <p>Klik tombol di bawah untuk membuat dan mengunduh ikon standar PWA langsung di peramban.</p>
+  <div>
+    <button onclick="generateAndDownload(192, 'icon-192.png')">Unduh icon-192.png</button>
+    <button onclick="generateAndDownload(512, 'icon-512.png')">Unduh icon-512.png</button>
+  </div>
+  <canvas id="canvasPreview" width="192" height="192"></canvas>
+
+  <script>
+    function drawPocketLedgerIcon(ctx, size) {
+      // 1. Background
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, size, size);
+
+      // 2. Outer Card with safe margin
+      const margin = size * 0.15;
+      const cardSize = size - 2 * margin;
+      const r = size * 0.16;
+
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = Math.max(2, size / 40);
+      ctx.beginPath();
+      ctx.roundRect(margin, margin, cardSize, cardSize, r);
+      ctx.fill();
+      ctx.stroke();
+
+      // 3. Inner Wallet
+      const wLeft = size * 0.26;
+      const wTop = size * 0.32;
+      const wWidth = size * 0.48;
+      const wHeight = size * 0.36;
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.roundRect(wLeft, wTop, wWidth, wHeight, size * 0.08);
+      ctx.fill();
+
+      // 4. Wallet Button / Circle
+      const btnX = size * 0.62;
+      const btnY = size * 0.50;
+      const btnR = Math.max(4, size * 0.05);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function generateAndDownload(size, filename) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      drawPocketLedgerIcon(ctx, size);
+
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+
+      // Preview
+      const previewCanvas = document.getElementById('canvasPreview');
+      previewCanvas.width = size > 256 ? 256 : size;
+      previewCanvas.height = size > 256 ? 256 : size;
+      const pctx = previewCanvas.getContext('2d');
+      pctx.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+    }
+
+    // Auto preview 192
+    window.onload = () => {
+      const previewCanvas = document.getElementById('canvasPreview');
+      drawPocketLedgerIcon(previewCanvas.getContext('2d'), 192);
+    };
+  </script>
+</body>
+</html>
+
