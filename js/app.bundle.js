@@ -461,7 +461,6 @@ const SplitBillService = {
 
   async add(splitBill) {
     const bill = {
-      ...splitBill,
       title: (splitBill.title || 'Split Bill').trim(),
       date: splitBill.date || new Date().toISOString(),
       totalAmount: Number(splitBill.totalAmount) || 0,
@@ -473,11 +472,16 @@ const SplitBillService = {
       flatFee: Number(splitBill.flatFee) || 0,
       paymentInfo: splitBill.paymentInfo || ''
     };
+    // Sertakan ID hanya jika berupa angka valid (misal saat restore backup), jangan sertakan jika null/undefined
+    if (splitBill.id && !isNaN(Number(splitBill.id))) {
+      bill.id = Number(splitBill.id);
+    }
     return await db.splitBills.add(bill);
   },
 
   async update(id, changes) {
     const cleanChanges = { ...changes };
+    delete cleanChanges.id; // Primary key tidak boleh diubah
     if (cleanChanges.totalAmount !== undefined) {
       cleanChanges.totalAmount = Number(cleanChanges.totalAmount);
     }
@@ -1789,28 +1793,87 @@ class SplitBillComponent {
     const btnSaveSession = container.querySelector('#btn-save-session');
     if (btnSaveSession) {
       btnSaveSession.onclick = async () => {
-        if (this.session.participants.length < 2) {
-          alert('Minimal 2 orang peserta untuk menyimpan sesi split bill.');
-          return;
-        }
-        const calcResult = calculateSplitBill(this.session);
-        const sessionPayload = {
-          ...this.session,
-          totalAmount: calcResult.grandTotal,
-          status: 'open',
-          date: this.session.date || new Date().toISOString()
-        };
+        try {
+          if (!this.session.participants || this.session.participants.length < 2) {
+            alert('Minimal 2 orang peserta untuk menyimpan sesi split bill.');
+            return;
+          }
 
-        if (this.session.id) {
-          await SplitBillService.update(this.session.id, sessionPayload);
-          this.showToast('Sesi split bill berhasil diperbarui di database offline!');
-        } else {
-          const newId = await SplitBillService.add(sessionPayload);
-          this.session.id = newId;
-          this.showToast('Sesi split bill berhasil disimpan ke database offline!');
-        }
+          const calcResult = calculateSplitBill(this.session);
+          const sessionPayload = {
+            title: (this.session.title || 'Makan Bersama').trim(),
+            totalAmount: calcResult.grandTotal,
+            status: 'open',
+            date: this.session.date || new Date().toISOString(),
+            participants: [...this.session.participants],
+            items: this.session.items.map(it => ({
+              id: it.id,
+              name: it.name || 'Menu',
+              price: Number(it.price) || 0,
+              participants: [...(it.participants || [])]
+            })),
+            taxPercent: Number(this.session.taxPercent) || 0,
+            servicePercent: Number(this.session.servicePercent) || 0,
+            flatFee: Number(this.session.flatFee) || 0,
+            paymentInfo: this.session.paymentInfo || ''
+          };
 
-        this.onDataChanged(true); // reload saved list from DB
+          // Berikan indikator visual loading/saving
+          btnSaveSession.disabled = true;
+          btnSaveSession.innerHTML = `
+            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span>Menyimpan ke Database...</span>
+          `;
+
+          if (this.session.id) {
+            await SplitBillService.update(this.session.id, sessionPayload);
+            this.showToast('Sesi split bill berhasil diperbarui di database offline!');
+          } else {
+            const newId = await SplitBillService.add(sessionPayload);
+            this.session.id = newId;
+            this.showToast('Sesi split bill berhasil disimpan ke database offline!');
+          }
+
+          // Efek visual sukses pada tombol
+          btnSaveSession.className = 'w-full py-3 px-4 rounded-2xl bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 transition-all';
+          btnSaveSession.innerHTML = `
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span>Tersimpan di Database Offline!</span>
+          `;
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+
+          // Sinkronkan data ke router (memuat riwayat sesi terbaru dari IndexedDB)
+          await this.onDataChanged(true);
+
+          setTimeout(() => {
+            if (btnSaveSession) {
+              btnSaveSession.disabled = false;
+              btnSaveSession.className = 'w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-bold shadow-lg shadow-indigo-950/40 flex items-center justify-center gap-2 transition-all';
+              btnSaveSession.innerHTML = `
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Simpan Sesi ke Database Offline</span>
+              `;
+              if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+              }
+            }
+          }, 2000);
+        } catch (saveErr) {
+          console.error('[SplitBill] Gagal menyimpan sesi ke IndexedDB:', saveErr);
+          alert('Gagal menyimpan sesi ke database: ' + (saveErr.message || saveErr));
+          if (btnSaveSession) {
+            btnSaveSession.disabled = false;
+            btnSaveSession.innerHTML = `
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span>Simpan Sesi ke Database Offline</span>
+            `;
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
+          }
+        }
       };
     }
   }

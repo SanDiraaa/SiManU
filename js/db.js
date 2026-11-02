@@ -179,7 +179,6 @@ export const SplitBillService = {
 
   async add(splitBill) {
     const bill = {
-      ...splitBill,
       title: (splitBill.title || 'Split Bill').trim(),
       date: splitBill.date || new Date().toISOString(),
       totalAmount: Number(splitBill.totalAmount) || 0,
@@ -191,11 +190,16 @@ export const SplitBillService = {
       flatFee: Number(splitBill.flatFee) || 0,
       paymentInfo: splitBill.paymentInfo || ''
     };
+    // Sertakan ID hanya jika berupa angka valid (misal saat restore backup), jangan sertakan jika null/undefined
+    if (splitBill.id && !isNaN(Number(splitBill.id))) {
+      bill.id = Number(splitBill.id);
+    }
     return await db.splitBills.add(bill);
   },
 
   async update(id, changes) {
     const cleanChanges = { ...changes };
+    delete cleanChanges.id; // Primary key tidak boleh diubah
     if (cleanChanges.totalAmount !== undefined) {
       cleanChanges.totalAmount = Number(cleanChanges.totalAmount);
     }
