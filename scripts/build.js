@@ -1,6 +1,7 @@
 /**
- * PocketLedger Build Script for Capacitor
- * Menyalin aset web publik ke folder target 'www/' sebelum sinkronisasi Android
+ * PocketLedger Build Script for Capacitor & Production
+ * 1. Menggabungkan modul JS ke js/app.bundle.js
+ * 2. Menyalin aset web publik ke folder target 'www/' sebelum sinkronisasi Android
  */
 
 const fs = require('fs');
@@ -8,6 +9,10 @@ const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const WWW_DIR = path.resolve(ROOT_DIR, 'www');
+
+// Jalankan bundler terlebih dahulu
+console.log('[Build] Menjalankan bundler modul JS...');
+require('./bundle.js');
 
 console.log('[Build] Menyiapkan direktori www...');
 

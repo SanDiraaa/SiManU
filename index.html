@@ -42,14 +42,24 @@
     }
   </script>
 
-  <!-- 2. Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- 2. Dexie.js (Offline Local with CDN Fallback) -->
+  <script src="./js/vendor/dexie.min.js"></script>
+  <script>
+    if (typeof Dexie === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"><\/script>');
+    }
+  </script>
 
-  <!-- 3. FontAwesome CDN (Sebagai opsi pelengkap) -->
+  <!-- 3. Lucide Icons (Offline Local with CDN Fallback) -->
+  <script src="./js/vendor/lucide.min.js"></script>
+  <script>
+    if (typeof lucide === 'undefined') {
+      document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+    }
+  </script>
+
+  <!-- 4. FontAwesome CDN (Sebagai opsi pelengkap) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-
-  <!-- 4. Dexie.js CDN (v3.2.4) -->
-  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
 
   <style>
     /* Mobile-optimized touch behaviour, pull-to-refresh prevention and safe areas */
@@ -169,12 +179,42 @@
 
   </div>
 
-  <!-- Database & Application Scripts -->
-  <script type="module" src="./js/db.js"></script>
-  <script type="module" src="./js/app.js"></script>
+  <!-- Universal Bundled Application Script -->
+  <!-- Kompatibel penuh: file:/// (double click), localhost, PWA offline, dan Android Capacitor -->
+  <script src="./js/app.bundle.js"></script>
 
   <script>
-    // Initialize icons as early fallback
+    // Watchdog Loading Timer: Jika setelah 3.5 detik konten belum termuat, berikan instruksi ramah
+    setTimeout(function() {
+      const content = document.getElementById('app-content');
+      if (content && content.innerHTML.includes('Memuat PocketLedger...')) {
+        const isFileProtocol = window.location.protocol === 'file:';
+        content.innerHTML = `
+          <div class="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-slate-800/40 rounded-3xl border border-slate-800 text-slate-300 space-y-4 animate-fade-in">
+            <div class="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/30">
+              <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white mb-1.5">Membutuhkan Akses Local Server</h3>
+              <p class="text-xs text-slate-400 leading-relaxed max-w-xs">
+                ${isFileProtocol 
+                  ? 'Browser membatasi beberapa modul & penyimpanan IndexedDB jika dibuka langsung lewat protokol <code>file:///</code>. Disarankan jalankan server lokal: <code>python -m http.server 8000</code> atau ekstensi Live Server.' 
+                  : 'Database IndexedDB belum siap atau dibatasi oleh pengaturan mode privasi browser Anda.'}
+              </p>
+            </div>
+            <button onclick="window.location.reload()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-950/40 transition-all active:scale-95 flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Muat Ulang Halaman
+            </button>
+          </div>
+        `;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
+    }, 3500);
+
+    // Inisialisasi ikon Lucide fallback
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons();
     }

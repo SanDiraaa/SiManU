@@ -4,13 +4,16 @@
  * Siklus hidup: Install, Activate, Fetch (Cache First with Network Fallback)
  */
 
-const CACHE_NAME = 'pocketledger-pwa-v2.0';
+const CACHE_NAME = 'pocketledger-pwa-v2.1';
 
 // Daftar aset statis inti yang wajib dicache saat instalasi
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './js/vendor/dexie.min.js',
+  './js/vendor/lucide.min.js',
+  './js/app.bundle.js',
   './js/db.js',
   './js/app.js',
   './js/utils/formatters.js',
@@ -24,9 +27,7 @@ const PRECACHE_ASSETS = [
   './icons/icon-maskable.png',
   './icons/screenshot-mobile.png',
   './icons/screenshot-desktop.png',
-  'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
-  'https://unpkg.com/lucide@latest'
+  'https://cdn.tailwindcss.com'
 ];
 
 // 1. INSTALL EVENT: Pre-cache seluruh aset aplikasi offline

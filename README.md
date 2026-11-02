@@ -83,13 +83,15 @@ Di Android Studio, pilih **Build** > **Build Bundle(s) / APK(s)** > **Build APK(
 SiManU/
 ├── index.html                  # Shell layout aplikasi & bottom navigation
 ├── manifest.json               # Konfigurasi PWA standar PWABuilder
-├── sw.js                       # Service Worker Cache-First offline (v2.0)
+├── sw.js                       # Service Worker Cache-First offline (v2.1)
 ├── capacitor.config.json       # Konfigurasi Android Capacitor (Secure Scheme)
 ├── package.json                # Dependensi & skrip build
 ├── icons/                      # Ikon PWA (any & maskable) dan screenshots
 ├── js/
-│   ├── app.js                  # State Router & App Controller
+│   ├── app.bundle.js           # Bundle mandiri siap pakai (offline & multi-platform)
+│   ├── app.js                  # State Router & App Controller (ES Module)
 │   ├── db.js                   # Skema Dexie.js & CRUD Service
+│   ├── vendor/                 # Pustaka lokal offline (dexie.min.js, lucide.min.js)
 │   ├── components/
 │   │   ├── expense.js          # Tab Transaksi & Quick Add Bottom Sheet
 │   │   ├── splitbill.js        # Tab Split Bill & Kalkulasi Proporsional
@@ -99,6 +101,7 @@ SiManU/
 │       ├── formatters.js       # Formatter Rupiah, Tanggal & Input Pad
 │       └── share.js            # Generator Format Teks Rapi WhatsApp
 ├── scripts/
+│   ├── bundle.js               # Skrip penggabung modul JS ke app.bundle.js
 │   ├── build.js                # Skrip build aset ke folder www/
 │   ├── generate-icons.py       # Generator ikon Python Pillow
 │   └── generate-icons.html     # Generator ikon Canvas peramban
@@ -110,3 +113,4 @@ SiManU/
 ## 📄 Lisensi
 
 Proyek ini dilisensikan di bawah [MIT License](LICENSE).
+
